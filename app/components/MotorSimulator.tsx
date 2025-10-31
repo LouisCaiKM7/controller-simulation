@@ -13,6 +13,7 @@ export default function MotorSimulator() {
   const [pidEnabled, setPidEnabled] = useState(false);
   const [ffEnabled, setFfEnabled] = useState(false);
   const [desiredOutput, setDesiredOutput] = useState(50); // Percentage 0-100
+  const [sliderStep, setSliderStep] = useState(1); // Slider step size
   const [currentOutput, setCurrentOutput] = useState(0);
   const [motorVoltage, setMotorVoltage] = useState(0);
   const [velocity, setVelocity] = useState(0);
@@ -23,10 +24,20 @@ export default function MotorSimulator() {
   const [kI, setKI] = useState(0);
   const [kD, setKD] = useState(0);
   
+  // PID parameter bounds
+  const [kPMax, setKPMax] = useState(1);
+  const [kIMax, setKIMax] = useState(0.1);
+  const [kDMax, setKDMax] = useState(0.5);
+  
   // FF parameters
   const [kS, setKS] = useState(0); // Static friction
   const [kV, setKV] = useState(0); // Velocity
   const [kA, setKA] = useState(0); // Acceleration
+  
+  // FF parameter bounds
+  const [kSMax, setKSMax] = useState(1);
+  const [kVMax, setKVMax] = useState(2);
+  const [kAMax, setKAMax] = useState(1);
   
   // Graph data
   const [graphData, setGraphData] = useState<DataPoint[]>([]);
@@ -179,18 +190,72 @@ export default function MotorSimulator() {
       {/* Desired Output Control */}
       <div className="bg-slate-800 rounded-lg p-6 mb-6 shadow-xl">
         <h2 className="text-2xl font-semibold text-white mb-4">Desired Output</h2>
-        <div className="flex items-center gap-4">
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={desiredOutput}
-            onChange={(e) => setDesiredOutput(Number(e.target.value))}
-            className="flex-1 h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-          />
-          <span className="text-2xl font-bold text-white w-20 text-right">
-            {desiredOutput}%
-          </span>
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step={sliderStep}
+              value={desiredOutput}
+              onChange={(e) => setDesiredOutput(Number(e.target.value))}
+              className="flex-1 h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+            />
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step={sliderStep}
+              value={desiredOutput}
+              onChange={(e) => setDesiredOutput(Math.max(0, Math.min(100, Number(e.target.value))))}
+              className="w-20 px-2 py-1 text-xl font-bold text-white bg-slate-700 border border-slate-600 rounded text-right"
+            />
+            <span className="text-xl font-bold text-white">%</span>
+          </div>
+          
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-slate-300">Step size:</span>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="step"
+                checked={sliderStep === 0.1}
+                onChange={() => setSliderStep(0.1)}
+                className="w-4 h-4"
+              />
+              <span className="text-white">0.1</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="step"
+                checked={sliderStep === 1}
+                onChange={() => setSliderStep(1)}
+                className="w-4 h-4"
+              />
+              <span className="text-white">1</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="step"
+                checked={sliderStep === 5}
+                onChange={() => setSliderStep(5)}
+                className="w-4 h-4"
+              />
+              <span className="text-white">5</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="step"
+                checked={sliderStep === 10}
+                onChange={() => setSliderStep(10)}
+                className="w-4 h-4"
+              />
+              <span className="text-white">10</span>
+            </label>
+          </div>
         </div>
       </div>
       
@@ -312,15 +377,27 @@ export default function MotorSimulator() {
           <h2 className="text-2xl font-semibold text-white mb-4">PID Parameters</h2>
           <div className="space-y-4">
             <div>
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between items-center mb-2">
                 <label className="text-lg text-slate-300">kP (Proportional)</label>
-                <span className="text-lg font-bold text-white">{kP.toFixed(3)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-white">{kP.toFixed(3)}</span>
+                  <span className="text-slate-400 text-sm">/ Max:</span>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="10"
+                    step="0.1"
+                    value={kPMax}
+                    onChange={(e) => setKPMax(Math.max(0.1, Number(e.target.value)))}
+                    className="w-16 px-1 py-0.5 text-sm text-white bg-slate-600 border border-slate-500 rounded"
+                  />
+                </div>
               </div>
               <input
                 type="range"
                 min="0"
-                max="1"
-                step="0.001"
+                max={kPMax}
+                step={kPMax / 1000}
                 value={kP}
                 onChange={(e) => setKP(Number(e.target.value))}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
@@ -328,15 +405,27 @@ export default function MotorSimulator() {
             </div>
             
             <div>
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between items-center mb-2">
                 <label className="text-lg text-slate-300">kI (Integral)</label>
-                <span className="text-lg font-bold text-white">{kI.toFixed(3)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-white">{kI.toFixed(3)}</span>
+                  <span className="text-slate-400 text-sm">/ Max:</span>
+                  <input
+                    type="number"
+                    min="0.01"
+                    max="5"
+                    step="0.01"
+                    value={kIMax}
+                    onChange={(e) => setKIMax(Math.max(0.01, Number(e.target.value)))}
+                    className="w-16 px-1 py-0.5 text-sm text-white bg-slate-600 border border-slate-500 rounded"
+                  />
+                </div>
               </div>
               <input
                 type="range"
                 min="0"
-                max="0.1"
-                step="0.001"
+                max={kIMax}
+                step={kIMax / 1000}
                 value={kI}
                 onChange={(e) => setKI(Number(e.target.value))}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
@@ -344,15 +433,27 @@ export default function MotorSimulator() {
             </div>
             
             <div>
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between items-center mb-2">
                 <label className="text-lg text-slate-300">kD (Derivative)</label>
-                <span className="text-lg font-bold text-white">{kD.toFixed(3)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-white">{kD.toFixed(3)}</span>
+                  <span className="text-slate-400 text-sm">/ Max:</span>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="5"
+                    step="0.1"
+                    value={kDMax}
+                    onChange={(e) => setKDMax(Math.max(0.1, Number(e.target.value)))}
+                    className="w-16 px-1 py-0.5 text-sm text-white bg-slate-600 border border-slate-500 rounded"
+                  />
+                </div>
               </div>
               <input
                 type="range"
                 min="0"
-                max="0.5"
-                step="0.001"
+                max={kDMax}
+                step={kDMax / 1000}
                 value={kD}
                 onChange={(e) => setKD(Number(e.target.value))}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
@@ -368,15 +469,27 @@ export default function MotorSimulator() {
           <h2 className="text-2xl font-semibold text-white mb-4">Feedforward Parameters</h2>
           <div className="space-y-4">
             <div>
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between items-center mb-2">
                 <label className="text-lg text-slate-300">kS (Static Friction)</label>
-                <span className="text-lg font-bold text-white">{kS.toFixed(2)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-white">{kS.toFixed(2)}</span>
+                  <span className="text-slate-400 text-sm">/ Max:</span>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="10"
+                    step="0.1"
+                    value={kSMax}
+                    onChange={(e) => setKSMax(Math.max(0.1, Number(e.target.value)))}
+                    className="w-16 px-1 py-0.5 text-sm text-white bg-slate-600 border border-slate-500 rounded"
+                  />
+                </div>
               </div>
               <input
                 type="range"
                 min="0"
-                max="1"
-                step="0.01"
+                max={kSMax}
+                step={kSMax / 100}
                 value={kS}
                 onChange={(e) => setKS(Number(e.target.value))}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
@@ -384,15 +497,27 @@ export default function MotorSimulator() {
             </div>
             
             <div>
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between items-center mb-2">
                 <label className="text-lg text-slate-300">kV (Velocity)</label>
-                <span className="text-lg font-bold text-white">{kV.toFixed(2)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-white">{kV.toFixed(2)}</span>
+                  <span className="text-slate-400 text-sm">/ Max:</span>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="10"
+                    step="0.1"
+                    value={kVMax}
+                    onChange={(e) => setKVMax(Math.max(0.1, Number(e.target.value)))}
+                    className="w-16 px-1 py-0.5 text-sm text-white bg-slate-600 border border-slate-500 rounded"
+                  />
+                </div>
               </div>
               <input
                 type="range"
                 min="0"
-                max="2"
-                step="0.01"
+                max={kVMax}
+                step={kVMax / 100}
                 value={kV}
                 onChange={(e) => setKV(Number(e.target.value))}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
@@ -400,15 +525,27 @@ export default function MotorSimulator() {
             </div>
             
             <div>
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between items-center mb-2">
                 <label className="text-lg text-slate-300">kA (Acceleration)</label>
-                <span className="text-lg font-bold text-white">{kA.toFixed(2)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-white">{kA.toFixed(2)}</span>
+                  <span className="text-slate-400 text-sm">/ Max:</span>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="10"
+                    step="0.1"
+                    value={kAMax}
+                    onChange={(e) => setKAMax(Math.max(0.1, Number(e.target.value)))}
+                    className="w-16 px-1 py-0.5 text-sm text-white bg-slate-600 border border-slate-500 rounded"
+                  />
+                </div>
               </div>
               <input
                 type="range"
                 min="0"
-                max="1"
-                step="0.01"
+                max={kAMax}
+                step={kAMax / 100}
                 value={kA}
                 onChange={(e) => setKA(Number(e.target.value))}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
