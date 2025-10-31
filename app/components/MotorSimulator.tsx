@@ -46,23 +46,25 @@ export default function MotorSimulator() {
       const targetOutput = desiredOutput;
       const error = targetOutput - currentOutput;
       
-      // Calculate velocity and acceleration
+      // Calculate velocity and acceleration from setpoint changes
       const dt = SIMULATION_RATE / 1000;
-      const currentVel = (targetOutput - lastVelocity.current) / dt;
-      const currentAccel = (currentVel - velocity) / dt;
+      const setpointVelocity = (targetOutput - lastVelocity.current) / dt;
+      const setpointAcceleration = (setpointVelocity - velocity) / dt;
       
       let voltage = 0;
       
       // Feedforward control with kS, kV, kA
       if (ffEnabled) {
-        // kS: Static friction compensation (applied when motor should move)
-        const staticComponent = targetOutput > 0 ? kS * MAX_VOLTAGE : 0;
+        // kS: Static friction - constant voltage to overcome friction when motor needs to hold position
+        // Applied when there's an error (motor needs to move or hold)
+        const staticComponent = Math.abs(error) > 0.5 ? Math.sign(error) * kS * MAX_VOLTAGE : 0;
         
-        // kV: Velocity feedforward
-        const velocityComponent = kV * targetOutput;
+        // kV: Velocity feedforward - voltage proportional to error (how fast we need to move)
+        // This drives the motor toward the setpoint
+        const velocityComponent = kV * error;
         
-        // kA: Acceleration feedforward
-        const accelComponent = kA * (targetOutput - lastVelocity.current) * 10;
+        // kA: Acceleration feedforward - helps with rapid setpoint changes
+        const accelComponent = kA * setpointVelocity;
         
         voltage += staticComponent + velocityComponent + accelComponent;
       }
@@ -79,8 +81,14 @@ export default function MotorSimulator() {
       // Clamp voltage to ±12V
       voltage = Math.max(-MAX_VOLTAGE, Math.min(MAX_VOLTAGE, voltage));
       
-      // Simple motor model: output follows voltage with some inertia
-      const newOutput = currentOutput + (voltage / MAX_VOLTAGE) * 100 * 0.1;
+      // More realistic motor model with damping
+      // Motor equation: velocity change is proportional to voltage minus friction/damping
+      const motorConstant = 0.15; // How quickly motor responds to voltage
+      const dampingConstant = 0.08; // Natural damping/friction
+      
+      const velocityChange = (voltage * motorConstant - velocity * dampingConstant) * dt;
+      const newVelocity = velocity + velocityChange;
+      const newOutput = currentOutput + newVelocity * dt;
       const clampedOutput = Math.max(0, Math.min(100, newOutput));
       
       // Update graph data
@@ -99,8 +107,8 @@ export default function MotorSimulator() {
       
       setCurrentOutput(clampedOutput);
       setMotorVoltage(voltage);
-      setVelocity(currentVel);
-      setAcceleration(currentAccel);
+      setVelocity(newVelocity);
+      setAcceleration(velocityChange / dt);
       lastVelocity.current = targetOutput;
     }, SIMULATION_RATE);
     
@@ -362,13 +370,13 @@ export default function MotorSimulator() {
             <div>
               <div className="flex justify-between mb-2">
                 <label className="text-lg text-slate-300">kS (Static Friction)</label>
-                <span className="text-lg font-bold text-white">{kS.toFixed(3)}</span>
+                <span className="text-lg font-bold text-white">{kS.toFixed(2)}</span>
               </div>
               <input
                 type="range"
                 min="0"
-                max="0.5"
-                step="0.001"
+                max="1"
+                step="0.01"
                 value={kS}
                 onChange={(e) => setKS(Number(e.target.value))}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
@@ -378,13 +386,13 @@ export default function MotorSimulator() {
             <div>
               <div className="flex justify-between mb-2">
                 <label className="text-lg text-slate-300">kV (Velocity)</label>
-                <span className="text-lg font-bold text-white">{kV.toFixed(3)}</span>
+                <span className="text-lg font-bold text-white">{kV.toFixed(2)}</span>
               </div>
               <input
                 type="range"
                 min="0"
-                max="0.5"
-                step="0.001"
+                max="2"
+                step="0.01"
                 value={kV}
                 onChange={(e) => setKV(Number(e.target.value))}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
@@ -394,13 +402,13 @@ export default function MotorSimulator() {
             <div>
               <div className="flex justify-between mb-2">
                 <label className="text-lg text-slate-300">kA (Acceleration)</label>
-                <span className="text-lg font-bold text-white">{kA.toFixed(3)}</span>
+                <span className="text-lg font-bold text-white">{kA.toFixed(2)}</span>
               </div>
               <input
                 type="range"
                 min="0"
-                max="0.2"
-                step="0.001"
+                max="1"
+                step="0.01"
                 value={kA}
                 onChange={(e) => setKA(Number(e.target.value))}
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
